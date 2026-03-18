@@ -136,7 +136,7 @@ const TransactionItems : React.FC<TransactionItemProps> = ({transaction}) => {
       </div>
 
       <div className="flex gap-2 items-center">
-        {/* Bouton PDF */}
+        {/* Bouton PDF - visible sur tous les écrans */}
         <button 
           onClick={exportTransactionToPDF}
           className='btn btn-sm btn-ghost text-blue-500 hover:text-blue-700'
@@ -145,10 +145,10 @@ const TransactionItems : React.FC<TransactionItemProps> = ({transaction}) => {
           <FileDown className='w-4 h-4' />
         </button>
 
-        {/* Lien voir plus */}
+        {/* Lien voir plus - caché sur mobile, visible seulement à partir de md (768px) */}
         <Link 
           href={`/manage/${transaction.budgetId}`} 
-          className='btn btn-sm'
+          className='btn btn-sm hidden md:flex'
         >
           Voir plus
         </Link> 
