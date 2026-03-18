@@ -209,7 +209,7 @@ const Page = () => {
             {isLoading || !isLoaded ? (
                 <div className='p-4'>
                     <div className='flex justify-between items-center mb-6'>
-                        <h1 className='text-2xl font-bold'>Tableau de bord financier</h1>
+                        <h1 className='text-2xl font-bold text-blue-300  '>Tableau de bord</h1>
                         <button className='btn btn-primary gap-2' disabled>
                             <FileDown className='w-5 h-5' />
                             Exporter en PDF
@@ -229,7 +229,7 @@ const Page = () => {
                 <div className='p-4'>
                     {/* En-tête avec bouton d'export PDF */}
                     <div className='flex justify-between items-center mb-6'>
-                        <h1 className='text-2xl font-bold'>Tableau de bord financier</h1>
+                        <h1 className='text-2xl font-bold text-blue-300'>Tableau de bord financier</h1>
                         <button 
                             onClick={exportToPDF}
                             className={`btn btn-primary gap-2 ${isExporting ? 'loading' : ''}`}
