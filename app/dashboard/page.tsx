@@ -229,7 +229,7 @@ const Page = () => {
                 <div className='p-4'>
                     {/* En-tête avec bouton d'export PDF */}
                     <div className='flex justify-between items-center mb-6'>
-                        <h1 className='text-2xl font-bold text-blue-300'>Tableau de bord financier</h1>
+                        
                         <button 
                             onClick={exportToPDF}
                             className={`btn btn-primary gap-2 ${isExporting ? 'loading' : ''}`}
