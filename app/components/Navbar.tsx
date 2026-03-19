@@ -32,15 +32,15 @@ const Navbar = () => {
 
               <Link href="/" className="no-underline">
                 <h1 className='flex text-2xl items-center font-bold'>
-                  <b className="text-violet-400">e </b>      
-                  <span className='text-yellow-400'>
-                    <b className='text-red-200 w-2xl'>.</b> 
-                    <b className="text-green-400">T</b>
-                    <b className='text-blue-400'>r</b>
-                    <b className="text-pink-400">a</b>                   
-                    <b className="text-red-400">c</b>
-                    <b>k</b>
+                  <span>
+                    <b className="text-violet-400">M</b>
+                    <b className="text-yellow-400">o</b>
+                    <b className="text-red-400">n</b>
+                    <b className="text-green-400">i</b>
+                    <b className="text-blue-400">t</b>
+                    <b className="text-pink-400">y</b>
                   </span>
+
                 </h1>
               </Link>
 
