@@ -99,7 +99,7 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
             <div className="w-full mt-4">
                 <div className="flex justify-between items-center text-xs mb-1">
                     <span>Progression</span>
-                    <span className="font-medium">{Math.round(progressValue)}%</span>
+                    <span className="font-medium bg-accent text-white rounded-lg ">{Math.round(progressValue)}%</span>
                 </div>
                 <progress 
                     className={`progress ${progressColor} w-full`}
