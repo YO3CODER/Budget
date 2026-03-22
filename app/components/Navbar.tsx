@@ -1,42 +1,43 @@
 "use client"
 import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
-import React, { useEffect } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { checkAndAddUser } from '../actions'
-import { Layers } from 'lucide-react'
+import { Layers, Package, DollarSign, Coins } from 'lucide-react'
 
 const Navbar = () => {
   const { isLoaded, isSignedIn, user } = useUser();
 
-  useEffect(() => {
-
-    // Vérifier si l'utilisateur est connecté
-    // et que son email principal est disponible
+  const syncUser = useCallback(async () => {
     if (user?.primaryEmailAddress?.emailAddress) {
-
-      // Appeler la fonction serveur pour :
-      // - Vérifier si l'utilisateur existe déjà en base de données
-      // - L'ajouter s'il n'existe pas
-      checkAndAddUser(user.primaryEmailAddress.emailAddress)
+      try {
+        await checkAndAddUser(user.primaryEmailAddress.emailAddress);
+        console.log('Utilisateur synchronisé avec succès');
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation:', error);
+      }
     }
+  }, [user]);
 
-    // Le tableau vide [] signifie que ce useEffect
-    // s'exécute uniquement au premier rendu du composant
-  }, [])
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      syncUser();
+    }
+  }, [isLoaded, isSignedIn, user, syncUser]);
 
   return (
-    <div className="bg-base-200/30 px-5 md:px-[10%] py-4 ">
+    <div className="bg-base-200/30 px-4 sm:px-5 md:px-[10%] py-3 sm:py-4 border-b border-base-300">
       {isLoaded &&
         (isSignedIn ? (
           <>
-            <div className='flex justify-between items-center'>
-
-              <Link href="/" className="no-underline">
+            <div className='flex justify-between items-center gap-4'>
+              {/* Logo */}
+              <Link href="/" className="no-underline flex-shrink-0">
                 <h1 className='flex text-2xl items-center font-bold'>
-                  <div className=' text-accent rounded-full p-2'>
-                        <Layers className='h-6 w-6' />
-                    </div>
-                  <span className="ml-2 text-2xl italic">
+                  <div className=' text-accent rounded-full p-1.5 sm:p-2'>
+                    <Coins className='h-5 w-5 sm:h-6 sm:w-6' />
+                  </div>
+                  <span className="ml-2 text-xl sm:text-2xl italic">
                     <b className="text-violet-400">M</b>
                     <b className="text-yellow-400">o</b>
                     <b className="text-red-400">n</b>
@@ -47,30 +48,51 @@ const Navbar = () => {
                 </h1>
               </Link>
 
-              {/* MENU DESKTOP */}
-              <div className="md:flex hidden items-center">
-                <Link href={'/budgets'} className="btn text-violet-400 hover:scale-105 transition">
-                  Mes Budgets
-                </Link>
-
-                <Link href={'/dashboard'} className="btn mx-4 text-blue-300 hover:scale-105 transition">
-                  Tableau de bord
-                </Link>
-
-                <Link href={'/transactions'} className="btn text-red-400 hover:scale-105 transition">
-                  Mes Transactions
+              {/* Groupe des boutons d'applications externes - visible sur desktop */}
+              <div className='hidden md:flex gap-2 items-center'>
+              
+               
+                <Link 
+                  href="https://stock-one-sepia.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <button 
+                    type="button"
+                    className="btn btn-accent btn-outline btn-sm whitespace-nowrap flex items-center gap-2"
+                    aria-label="Gérer le stock"
+                  >
+                    <Package className="h-4 w-4" />
+                    Gérer le stock
+                  </button>
                 </Link>
 
                 <Link 
                   href={'https://monity-xi.vercel.app'} 
-                  className="btn mx-4 text-green-400 hover:scale-105 transition"
+                  className="btn btn-accent btn-outline btn-sm flex items-center gap-2"
                   target="_blank"
                 >
+                  <Layers className="h-4 w-4" />
                   Facture
                 </Link>
+              </div>
 
-                <div className="ml-4">
-                  <UserButton />
+              {/* MENU DESKTOP */}
+              <div className="hidden md:flex items-center gap-2">
+                <Link href={'/budgets'} className="btn btn-sm text-violet-400 hover:scale-105 transition">
+                  Mes Budgets
+                </Link>
+
+                <Link href={'/dashboard'} className="btn btn-sm text-blue-300 hover:scale-105 transition">
+                  Tableau de bord
+                </Link>
+
+                <Link href={'/transactions'} className="btn btn-sm text-red-400 hover:scale-105 transition">
+                  Mes Transactions
+                </Link>
+
+                <div className="ml-2">
+                  <UserButton afterSignOutUrl="/" />
                 </div>
               </div>
             </div>
@@ -89,21 +111,56 @@ const Navbar = () => {
                 Transactions
               </Link>
 
+              {/* Boutons externes dans le menu mobile */}
+              <Link 
+                href="https://budget-psi-five.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <button 
+                  type="button"
+                  className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Gérer vos budgets
+                </button>
+              </Link>
+              
+              <Link 
+                href="https://stock-one-sepia.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <button 
+                  type="button"
+                  className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  Gérer le stock
+                </button>
+              </Link>
+
               <Link 
                 href={'https://monity-xi.vercel.app'} 
-                className="btn text-green-400 btn-sm"
+                className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
                 target="_blank"
               >
+                <Layers className="h-4 w-4" />
                 Facture
               </Link>
             </div>
           </>
         ) : (
-          // Optionnel : afficher quelque chose quand l'utilisateur n'est pas connecté
-          <div className="flex justify-between items-center">
+          // État non connecté
+          <div className="flex justify-between items-center gap-4">
             <Link href="/" className="no-underline">
               <h1 className='flex text-2xl items-center font-bold'>
-                <span>
+                <div className='bg-accent-content text-accent rounded-full p-1.5 sm:p-2'>
+                  <Coins className='h-5 w-5 sm:h-6 sm:w-6' />
+                </div>
+                <span className="ml-2 text-xl sm:text-2xl italic">
                   <b className="text-violet-400">M</b>
                   <b className="text-yellow-400">o</b>
                   <b className="text-red-400">n</b>
@@ -113,7 +170,7 @@ const Navbar = () => {
                 </span>
               </h1>
             </Link>
-            <Link href="/sign-in" className="btn btn-accent">
+            <Link href="/sign-in" className="btn btn-accent btn-sm">
               Se connecter
             </Link>
           </div>
