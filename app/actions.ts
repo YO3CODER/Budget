@@ -1,8 +1,8 @@
 "use server";
 
 import { query } from "@/lib/db";
-import { Budget, Transaction } from "@/type";
-import budgets from "./data";
+import { Budget} from "@/type";
+
 
 export async function checkAndAddUser(email: string) {
   if (!email) return;
