@@ -1,3 +1,7 @@
+/// <reference lib="webworker" />
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export type {};
+
 import { defaultCache } from "@serwist/next/worker";
 import { Serwist } from "serwist";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
