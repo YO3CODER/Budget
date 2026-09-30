@@ -58,7 +58,7 @@ const Navbar = () => {
             {/* Applications externes - desktop */}
             <div className='hidden md:flex gap-2 items-center'>
               <Link
-                href="https://stock-one-sepia.vercel.app/"
+                href="stock.yosite.fun"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -73,7 +73,7 @@ const Navbar = () => {
               </Link>
 
               <Link
-                href={'https://monity-xi.vercel.app'}
+                href={'https://facture.yosite.fun'}
                 className="btn btn-accent btn-outline btn-sm flex items-center gap-2"
                 target="_blank"
               >
@@ -127,7 +127,7 @@ const Navbar = () => {
               >
                 <li>
                   <a
-                    href="https://stock-one-sepia.vercel.app/"
+                    href="stock.yosite.fun"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={closeDropdown}
@@ -138,7 +138,7 @@ const Navbar = () => {
                 </li>
                 <li>
                   <a
-                    href="https://monity-xi.vercel.app"
+                    href="https://facture.yosite.fun"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={closeDropdown}
