@@ -1,9 +1,31 @@
 "use client"
 import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
+import Image from 'next/image'
 import React, { useEffect, useCallback } from 'react'
 import { checkAndAddUser } from '../actions'
-import { Layers, Package, Coins, ChevronDown, LayoutGrid } from 'lucide-react'
+import { Layers, Package, ChevronDown, LayoutGrid } from 'lucide-react'
+
+const Logo = () => (
+  <h1 className='flex text-2xl items-center font-bold'>
+    <Image
+      src="/logo.svg"
+      alt="Monity"
+      width={40}
+      height={40}
+      className="h-8 w-8 sm:h-10 sm:w-10"
+      priority
+    />
+    <span className="ml-2 text-xl sm:text-2xl italic">
+      <b className="text-violet-400">M</b>
+      <b className="text-yellow-400">o</b>
+      <b className="text-red-400">n</b>
+      <b className="text-green-400">i</b>
+      <b className="text-blue-400">t</b>
+      <b className="text-pink-400">y</b>
+    </span>
+  </h1>
+)
 
 const Navbar = () => {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -40,19 +62,7 @@ const Navbar = () => {
             <div className='flex justify-between items-center gap-4'>
               {/* Logo */}
               <Link href="/" className="no-underline flex-shrink-0">
-                <h1 className='flex text-2xl items-center font-bold'>
-                  <div className=' text-accent rounded-full p-1.5 sm:p-2'>
-                    <Coins className='h-5 w-5 sm:h-6 sm:w-6' />
-                  </div>
-                  <span className="ml-2 text-xl sm:text-2xl italic">
-                    <b className="text-violet-400">M</b>
-                    <b className="text-yellow-400">o</b>
-                    <b className="text-red-400">n</b>
-                    <b className="text-green-400">i</b>
-                    <b className="text-blue-400">t</b>
-                    <b className="text-pink-400">y</b>
-                  </span>
-                </h1>
+                <Logo />
               </Link>
 
               {/* Boutons d'applications externes - desktop */}
@@ -161,19 +171,7 @@ const Navbar = () => {
           // État non connecté
           <div className="flex justify-between items-center gap-4">
             <Link href="/" className="no-underline">
-              <h1 className='flex text-2xl items-center font-bold'>
-                <div className='bg-accent-content text-accent rounded-full p-1.5 sm:p-2'>
-                  <Coins className='h-5 w-5 sm:h-6 sm:w-6' />
-                </div>
-                <span className="ml-2 text-xl sm:text-2xl italic">
-                  <b className="text-violet-400">M</b>
-                  <b className="text-yellow-400">o</b>
-                  <b className="text-red-400">n</b>
-                  <b className="text-green-400">i</b>
-                  <b className="text-blue-400">t</b>
-                  <b className="text-pink-400">y</b>
-                </span>
-              </h1>
+              <Logo />
             </Link>
             <Link href="/sign-in" className="btn btn-accent btn-sm">
               Se connecter
