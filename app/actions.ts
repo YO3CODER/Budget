@@ -2,12 +2,33 @@
 
 import { query } from "@/lib/db";
 import { Budget } from "@/type";
+import { currentUser } from "@clerk/nextjs/server";
 
-export async function checkAndAddUser(email: string) {
-  if (!email) return;
+// Utilisateur connecté, lu côté serveur (jamais depuis le navigateur)
+async function requireUser(): Promise<{ id: string; email: string }> {
+  const clerkUser = await currentUser();
+  const email = clerkUser?.primaryEmailAddress?.emailAddress;
 
+  if (!email) {
+    throw new Error("Non authentifié");
+  }
+
+  const result = await query("SELECT id FROM users WHERE email = $1", [email]);
+
+  if (result.rows.length === 0) {
+    throw new Error("Utilisateur non trouvé");
+  }
+
+  return { id: result.rows[0].id, email };
+}
+
+export async function checkAndAddUser(_email?: string) {
   try {
-    const existingUser = await query("SELECT * FROM users WHERE email = $1", [
+    const clerkUser = await currentUser();
+    const email = clerkUser?.primaryEmailAddress?.emailAddress;
+    if (!email) return;
+
+    const existingUser = await query("SELECT id FROM users WHERE email = $1", [
       email,
     ]);
 
@@ -23,26 +44,23 @@ export async function checkAndAddUser(email: string) {
 }
 
 export async function addBudget(
-  email: string,
+  _email: string,
   nom: string,
   amount: number,
   selectedEmoji: string,
 ) {
   try {
-    const userResult = await query("SELECT id FROM users WHERE email = $1", [
-      email,
-    ]);
+    const user = await requireUser();
 
-    if (userResult.rows.length === 0) {
-      throw new Error("Utilisateur non trouvé");
+    if (!nom || !nom.trim()) throw new Error("Nom invalide");
+    if (!amount || amount <= 0) {
+      throw new Error("Le montant doit être un nombre positif");
     }
-
-    const userId = userResult.rows[0].id;
 
     await query(
       `INSERT INTO budgets (name, amount, emoji, user_id)
        VALUES ($1, $2, $3, $4)`,
-      [nom, amount, selectedEmoji, userId],
+      [nom.trim(), amount, selectedEmoji, user.id],
     );
   } catch (error) {
     console.error("Erreur lors de l'ajout du budget :", error);
@@ -50,17 +68,9 @@ export async function addBudget(
   }
 }
 
-export async function getBudgetByUser(email: string): Promise<Budget[]> {
+export async function getBudgetByUser(_email?: string): Promise<Budget[]> {
   try {
-    const userResult = await query("SELECT id FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (userResult.rows.length === 0) {
-      throw new Error("Utilisateur non trouvé");
-    }
-
-    const userId = userResult.rows[0].id;
+    const user = await requireUser();
 
     const rows = await query(
       `
@@ -81,7 +91,7 @@ export async function getBudgetByUser(email: string): Promise<Budget[]> {
       ON b.id = t.budget_id
       WHERE b.user_id = $1
       `,
-      [userId],
+      [user.id],
     );
 
     const budgetsMap: Record<string, Budget> = {};
@@ -123,6 +133,8 @@ export async function getBudgetByUser(email: string): Promise<Budget[]> {
 export async function getTransactionsByBudgetId(
   budget_id: string,
 ): Promise<Budget> {
+  const user = await requireUser();
+
   const result = await query(
     `
     SELECT 
@@ -140,9 +152,9 @@ export async function getTransactionsByBudgetId(
     FROM budgets b
     LEFT JOIN transactions t
     ON b.id = t.budget_id
-    WHERE b.id = $1
+    WHERE b.id = $1 AND b.user_id = $2
     `,
-    [budget_id],
+    [budget_id, user.id],
   );
 
   if (result.rows.length === 0) {
@@ -173,15 +185,23 @@ export async function getTransactionsByBudgetId(
   return budget;
 }
 
+// Dépense sur un budget : bloquée si elle dépasse budget prévu + revenus du budget
 export async function addTransactionToBudget(
   budgetId: string,
   amount: number,
   description: string,
 ) {
   try {
-    const budgetResult = await query("SELECT * FROM budgets WHERE id = $1", [
-      budgetId,
-    ]);
+    const user = await requireUser();
+
+    if (!amount || amount <= 0) {
+      throw new Error("Le montant doit être un nombre positif");
+    }
+
+    const budgetResult = await query(
+      "SELECT * FROM budgets WHERE id = $1 AND user_id = $2",
+      [budgetId, user.id],
+    );
 
     if (budgetResult.rows.length === 0) {
       throw new Error("Budget non trouvé");
@@ -212,7 +232,7 @@ export async function addTransactionToBudget(
       `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
        VALUES ($1, $2, $3, $4, $5, 'EXPENSE')
        RETURNING *`,
-      [amount, description, budget.emoji, budgetId, budget.user_id],
+      [amount, description, budget.emoji, budgetId, user.id],
     );
 
     return newTransaction.rows[0];
@@ -222,19 +242,23 @@ export async function addTransactionToBudget(
   }
 }
 
+// Revenu rattaché à un budget : augmente ses fonds disponibles
 export async function addIncomeToBudget(
   budgetId: string,
   amount: number,
   description: string,
 ) {
   try {
+    const user = await requireUser();
+
     if (!amount || amount <= 0) {
       throw new Error("Le montant doit être un nombre positif");
     }
 
-    const budgetResult = await query("SELECT * FROM budgets WHERE id = $1", [
-      budgetId,
-    ]);
+    const budgetResult = await query(
+      "SELECT * FROM budgets WHERE id = $1 AND user_id = $2",
+      [budgetId, user.id],
+    );
 
     if (budgetResult.rows.length === 0) {
       throw new Error("Budget non trouvé");
@@ -246,7 +270,7 @@ export async function addIncomeToBudget(
       `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
        VALUES ($1, $2, $3, $4, $5, 'INCOME')
        RETURNING *`,
-      [amount, description, budget.emoji, budgetId, budget.user_id],
+      [amount, description, budget.emoji, budgetId, user.id],
     );
 
     return newIncome.rows[0];
@@ -255,32 +279,25 @@ export async function addIncomeToBudget(
     throw error;
   }
 }
+
+// Revenu global, non rattaché à un budget
 export async function addIncome(
-  email: string,
+  _email: string,
   amount: number,
   description: string,
 ) {
   try {
-    if (!email) throw new Error("Email manquant");
+    const user = await requireUser();
+
     if (!amount || amount <= 0) {
       throw new Error("Le montant doit être un nombre positif");
     }
-
-    const userResult = await query("SELECT id FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (userResult.rows.length === 0) {
-      throw new Error("Utilisateur non trouvé");
-    }
-
-    const userId = userResult.rows[0].id;
 
     const newIncome = await query(
       `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
        VALUES ($1, $2, '', NULL, $3, 'INCOME')
        RETURNING *`,
-      [amount, description, userId],
+      [amount, description, user.id],
     );
 
     return newIncome.rows[0];
@@ -292,8 +309,22 @@ export async function addIncome(
 
 export const deleteBudget = async (budgetId: string) => {
   try {
+    const user = await requireUser();
+
+    const owned = await query(
+      "SELECT id FROM budgets WHERE id = $1 AND user_id = $2",
+      [budgetId, user.id],
+    );
+
+    if (owned.rows.length === 0) {
+      throw new Error("Budget non trouvé");
+    }
+
     await query("DELETE FROM transactions WHERE budget_id = $1", [budgetId]);
-    await query("DELETE FROM budgets WHERE id = $1", [budgetId]);
+    await query("DELETE FROM budgets WHERE id = $1 AND user_id = $2", [
+      budgetId,
+      user.id,
+    ]);
   } catch (error) {
     console.error(
       "Erreur lors de la suppression du budget et des transactions",
@@ -305,7 +336,16 @@ export const deleteBudget = async (budgetId: string) => {
 
 export async function deleteTransaction(transactionId: string) {
   try {
-    await query("DELETE FROM transactions WHERE id = $1", [transactionId]);
+    const user = await requireUser();
+
+    const result = await query(
+      "DELETE FROM transactions WHERE id = $1 AND user_id = $2",
+      [transactionId, user.id],
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error("Transaction non trouvée");
+    }
   } catch (error) {
     console.error("Erreur lors de la suppression de la transaction", error);
     throw error;
@@ -313,10 +353,12 @@ export async function deleteTransaction(transactionId: string) {
 }
 
 export async function getTransactionByEmailAndPeriod(
-  email: string,
+  _email: string,
   period: string,
 ) {
   try {
+    const user = await requireUser();
+
     const now = new Date();
     let dateLimit;
 
@@ -354,13 +396,12 @@ export async function getTransactionByEmailAndPeriod(
         b.name as "budgetName",
         b.emoji as "budgetEmoji"
       FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
       LEFT JOIN budgets b ON t.budget_id = b.id
-      WHERE u.email = $1
+      WHERE t.user_id = $1
       AND t.created_at >= $2
       ORDER BY t.created_at DESC
       `,
-      [email, dateLimit],
+      [user.id, dateLimit],
     );
 
     return result.rows.map((row: any) => ({
@@ -374,16 +415,17 @@ export async function getTransactionByEmailAndPeriod(
 }
 
 // Total des dépenses uniquement
-export async function getTotalTransactionAmount(email: string) {
+export async function getTotalTransactionAmount(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
       `
-      SELECT COALESCE(SUM(t.amount), 0) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.email = $1 AND t.type = 'EXPENSE'
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM transactions
+      WHERE user_id = $1 AND type = 'EXPENSE'
       `,
-      [email],
+      [user.id],
     );
 
     return Number(result.rows[0].total);
@@ -394,16 +436,17 @@ export async function getTotalTransactionAmount(email: string) {
 }
 
 // Total des revenus
-export async function getTotalIncomeAmount(email: string) {
+export async function getTotalIncomeAmount(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
       `
-      SELECT COALESCE(SUM(t.amount), 0) as total
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.email = $1 AND t.type = 'INCOME'
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM transactions
+      WHERE user_id = $1 AND type = 'INCOME'
       `,
-      [email],
+      [user.id],
     );
 
     return Number(result.rows[0].total);
@@ -414,18 +457,19 @@ export async function getTotalIncomeAmount(email: string) {
 }
 
 // Solde global : revenus moins dépenses
-export async function getBalance(email: string) {
+export async function getBalance(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
       `
       SELECT COALESCE(SUM(
-        CASE WHEN t.type = 'INCOME' THEN t.amount ELSE -t.amount END
+        CASE WHEN type = 'INCOME' THEN amount ELSE -amount END
       ), 0) as balance
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.email = $1
+      FROM transactions
+      WHERE user_id = $1
       `,
-      [email],
+      [user.id],
     );
 
     return Number(result.rows[0].balance);
@@ -435,16 +479,13 @@ export async function getBalance(email: string) {
   }
 }
 
-export async function getTotalTransactionCount(email: string) {
+export async function getTotalTransactionCount(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
-      `
-      SELECT COUNT(t.id) as count
-      FROM transactions t
-      INNER JOIN users u ON t.user_id = u.id
-      WHERE u.email = $1
-      `,
-      [email],
+      `SELECT COUNT(id) as count FROM transactions WHERE user_id = $1`,
+      [user.id],
     );
 
     return Number(result.rows[0].count);
@@ -454,29 +495,29 @@ export async function getTotalTransactionCount(email: string) {
   }
 }
 
-export async function getReachedBudgets(email: string) {
+export async function getReachedBudgets(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
       `
       WITH budget_stats AS (
         SELECT 
           b.id,
-          b.name,
           b.amount as budget_amount,
-          COALESCE(SUM(t.amount), 0) as total_spent
+          COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount END), 0) as total_spent,
+          COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount END), 0) as total_income
         FROM budgets b
-        LEFT JOIN transactions t 
-          ON b.id = t.budget_id AND t.type = 'EXPENSE'
-        INNER JOIN users u ON b.user_id = u.id
-        WHERE u.email = $1
-        GROUP BY b.id, b.name, b.amount
+        LEFT JOIN transactions t ON b.id = t.budget_id
+        WHERE b.user_id = $1
+        GROUP BY b.id, b.amount
       )
       SELECT 
         COUNT(*) as total_budgets,
-        COUNT(CASE WHEN total_spent >= budget_amount THEN 1 END) as reached_budgets
+        COUNT(CASE WHEN total_spent >= budget_amount + total_income THEN 1 END) as reached_budgets
       FROM budget_stats
       `,
-      [email],
+      [user.id],
     );
 
     const totalBudgets = Number(result.rows[0].total_budgets);
@@ -489,23 +530,24 @@ export async function getReachedBudgets(email: string) {
   }
 }
 
-export async function getUserBudgetData(email: string) {
+export async function getUserBudgetData(_email?: string) {
   try {
+    const user = await requireUser();
+
     const result = await query(
       `
       SELECT 
         b.id,
         b.name as "budgetName",
         b.amount as "totalBudgetAmount",
-        COALESCE(SUM(t.amount), 0) as "totalTransactionAmount"
+        COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount END), 0) as "totalTransactionAmount",
+        COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount END), 0) as "totalIncomeAmount"
       FROM budgets b
-      LEFT JOIN transactions t 
-        ON b.id = t.budget_id AND t.type = 'EXPENSE'
-      INNER JOIN users u ON b.user_id = u.id
-      WHERE u.email = $1
+      LEFT JOIN transactions t ON b.id = t.budget_id
+      WHERE b.user_id = $1
       GROUP BY b.id, b.name, b.amount
       `,
-      [email],
+      [user.id],
     );
 
     return result.rows;
