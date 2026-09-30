@@ -3,7 +3,7 @@ import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import React, { useEffect, useCallback } from 'react'
 import { checkAndAddUser } from '../actions'
-import { Layers, Package, DollarSign, Coins } from 'lucide-react'
+import { Layers, Package, Coins, ChevronDown, LayoutGrid } from 'lucide-react'
 
 const Navbar = () => {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -24,6 +24,13 @@ const Navbar = () => {
       syncUser();
     }
   }, [isLoaded, isSignedIn, user, syncUser]);
+
+  // Ferme la popup après un clic sur un lien
+  const closeDropdown = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
 
   return (
     <div className="bg-base-200/30 px-4 sm:px-5 md:px-[10%] py-3 sm:py-4 border-b border-base-300">
@@ -48,16 +55,14 @@ const Navbar = () => {
                 </h1>
               </Link>
 
-              {/* Groupe des boutons d'applications externes - visible sur desktop */}
+              {/* Boutons d'applications externes - desktop */}
               <div className='hidden md:flex gap-2 items-center'>
-              
-               
-                <Link 
+                <Link
                   href="https://stock-one-sepia.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <button 
+                  <button
                     type="button"
                     className="btn btn-accent btn-outline btn-sm whitespace-nowrap flex items-center gap-2"
                     aria-label="Gérer le stock"
@@ -67,8 +72,8 @@ const Navbar = () => {
                   </button>
                 </Link>
 
-                <Link 
-                  href={'https://monity-xi.vercel.app'} 
+                <Link
+                  href={'https://monity-xi.vercel.app'}
                   className="btn btn-accent btn-outline btn-sm flex items-center gap-2"
                   target="_blank"
                 >
@@ -111,45 +116,45 @@ const Navbar = () => {
                 Transactions
               </Link>
 
-              {/* Boutons externes dans le menu mobile */}
-              <Link 
-                href="https://budget-psi-five.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <button 
-                  type="button"
-                  className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
+              {/* Bouton combiné : popup avec Stock et Facture */}
+              <div className="dropdown dropdown-end">
+                <div
+                  tabIndex={0}
+                  role="button"
+                  className="btn btn-accent btn-outline btn-sm gap-1"
                 >
-                  <DollarSign className="h-4 w-4" />
-                  Gérer vos budgets
-                </button>
-              </Link>
-              
-              <Link 
-                href="https://stock-one-sepia.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <button 
-                  type="button"
-                  className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
+                  <LayoutGrid className="h-4 w-4" />
+                  Apps
+                  <ChevronDown className="h-3 w-3" />
+                </div>
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow-lg border border-base-300 mt-2"
                 >
-                  <Package className="h-4 w-4" />
-                  Gérer le stock
-                </button>
-              </Link>
-
-              <Link 
-                href={'https://monity-xi.vercel.app'} 
-                className="btn btn-accent btn-outline btn-sm w-full flex items-center justify-center gap-2"
-                target="_blank"
-              >
-                <Layers className="h-4 w-4" />
-                Facture
-              </Link>
+                  <li>
+                    <a
+                      href="https://stock-one-sepia.vercel.app/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={closeDropdown}
+                    >
+                      <Package className="h-4 w-4" />
+                      Gérer le stock
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://monity-xi.vercel.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={closeDropdown}
+                    >
+                      <Layers className="h-4 w-4" />
+                      Facture
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
           </>
         ) : (
