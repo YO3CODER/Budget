@@ -58,7 +58,7 @@ const Navbar = () => {
             {/* Applications externes - desktop */}
             <div className='hidden md:flex gap-2 items-center'>
               <Link
-                href="stock.yosite.fun"
+                href="https://stock.yosite.fun"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -127,7 +127,7 @@ const Navbar = () => {
               >
                 <li>
                   <a
-                    href="stock.yosite.fun"
+                    href="https://stock.yosite.fun"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={closeDropdown}
