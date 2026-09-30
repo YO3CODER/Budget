@@ -32,9 +32,8 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
     const availableAmount = budgetAmount + totalIncome
     const remainingAmount = availableAmount - totalExpenses
 
-    const progressValue = availableAmount > 0
-        ? Math.min((totalExpenses / availableAmount) * 100, 100)
-        : 0
+    const rawPercent = availableAmount > 0 ? (totalExpenses / availableAmount) * 100 : 0
+    const progressValue = Math.min(rawPercent, 100)
 
     // Espace insécable pour garder chaque montant sur une seule ligne
     const formatAmount = (amount: number): string => {
@@ -42,24 +41,34 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
         return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')
     }
 
-    const getProgressColor = (): string => {
-        if (progressValue >= 100) return 'progress-error'
-        if (progressValue >= 80) return 'progress-warning'
-        return 'progress-accent'
-    }
+    const isOver = remainingAmount < 0
+    const isReached = rawPercent >= 100
+    const isWarning = rawPercent >= 80 && !isReached
 
-    const getRemainingColor = (): string => {
-        if (remainingAmount < 0) return 'text-error'
-        if (remainingAmount < availableAmount * 0.2) return 'text-warning'
-        return 'text-success'
-    }
+    const progressColor = isReached
+        ? 'progress-error'
+        : isWarning
+            ? 'progress-warning'
+            : 'progress-accent'
+
+    const remainingColor = isOver
+        ? 'text-error'
+        : isWarning
+            ? 'text-warning'
+            : 'text-success'
+
+    const borderColor = isReached
+        ? 'border-error'
+        : isWarning
+            ? 'border-warning'
+            : 'border-amber-400'
 
     const hoverClass = enableHover === 1
         ? "hover:shadow-xl hover:border-accent hover:scale-[1.02] transition-all duration-200 cursor-pointer"
         : ""
 
     return (
-        <li className={`p-4 sm:p-5 rounded-2xl border-2 border-amber-400 bg-base-100
+        <li className={`p-4 sm:p-5 rounded-2xl border-2 ${borderColor} bg-base-100
             list-none mt-4 ${hoverClass}`}>
 
             {/* En-tête : emoji, nom, total */}
@@ -87,9 +96,9 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
                 </div>
                 <div className="flex flex-col items-end text-right">
                     <span className="text-xs text-gray-400">
-                        {remainingAmount < 0 ? 'En excès' : 'Restants'}
+                        {isOver ? 'En excès' : 'Restants'}
                     </span>
-                    <span className={`font-semibold whitespace-nowrap ${remainingColor(remainingAmount, availableAmount)}`}>
+                    <span className={`font-semibold whitespace-nowrap ${remainingColor}`}>
                         {formatAmount(Math.abs(remainingAmount))} FCFA
                     </span>
                 </div>
@@ -98,27 +107,30 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
             {/* Barre de progression */}
             <div className="flex items-center gap-3 mt-4">
                 <progress
-                    className={`progress ${getProgressColor()} w-full`}
+                    className={`progress ${progressColor} w-full`}
                     value={progressValue}
                     max="100"
                 />
                 <span className="text-xs font-semibold text-gray-500 shrink-0">
-                    {Math.round(progressValue)}%
+                    {Math.round(rawPercent)}%
                 </span>
             </div>
 
-            {/* Alerte si dépassement */}
-            {remainingAmount < 0 && (
+            {/* Alertes */}
+            {isReached && (
                 <div className="mt-3 text-xs text-error bg-error/10 p-2 rounded-lg">
-                    Budget dépassé de {formatAmount(Math.abs(remainingAmount))} FCFA
+                    {isOver
+                        ? `Budget dépassé de ${formatAmount(Math.abs(remainingAmount))} FCFA`
+                        : 'Budget atteint : plus rien de disponible'}
+                </div>
+            )}
+            {isWarning && (
+                <div className="mt-3 text-xs text-warning bg-warning/10 p-2 rounded-lg">
+                    Attention : {Math.round(rawPercent)} % du budget est consommé
                 </div>
             )}
         </li>
     )
-
-    function remainingColor(_remaining: number, _available: number): string {
-        return getRemainingColor()
-    }
 }
 
 export default BudgetItem

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   addIncomeToBudget,
@@ -10,6 +10,7 @@ import {
   getTransactionsByBudgetId,
 } from "@/app/actions"
 import BudgetItem from "@/app/components/BudgetItem"
+import AmountInput from "@/app/components/AmountInput"
 import { Budget } from "@/type"
 import Wrapper from "@/app/components/Wrapper"
 import Notification from "@/app/components/Notification"
@@ -19,6 +20,8 @@ interface PageProps {
   params: Promise<{ budgetId: string }>
 }
 
+const UNDO_DELAY = 5000
+
 const Page = ({ params }: PageProps) => {
   const router = useRouter()
 
@@ -27,12 +30,12 @@ const Page = ({ params }: PageProps) => {
   const [description, setDescription] = useState<string>("")
   const [amount, setAmount] = useState<string>("")
   const [notification, setNotification] = useState("")
-  const [toastVisible, setToastVisible] = useState(false)
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string>("")
+  const [hiddenIds, setHiddenIds] = useState<string[]>([])
+  const [undoVisible, setUndoVisible] = useState(false)
 
-  const closeNotification = () => {
-    setNotification("")
-  }
+  const descriptionRef = useRef<HTMLInputElement>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRef = useRef<string | null>(null)
 
   const openModal = (id: string) => {
     const modal = document.getElementById(id) as HTMLDialogElement
@@ -63,8 +66,16 @@ const Page = ({ params }: PageProps) => {
     fetchBudget()
   }, [params])
 
+  // Rafraîchissement après un ajout rapide
+  useEffect(() => {
+    if (!budgetId) return
+    const handler = () => fetchBudgetData(budgetId)
+    window.addEventListener("etrack:refresh", handler)
+    return () => window.removeEventListener("etrack:refresh", handler)
+  }, [budgetId])
+
   const validateForm = (): number | null => {
-    if (!amount || !description) {
+    if (!amount || !description.trim()) {
       setNotification("Veuillez remplir tous les champs")
       return null
     }
@@ -89,7 +100,7 @@ const Page = ({ params }: PageProps) => {
     if (amountNumber === null || !budgetId) return
 
     try {
-      await addTransactionToBudget(budgetId, amountNumber, description)
+      await addTransactionToBudget(budgetId, amountNumber, description.trim())
       setNotification("Dépense ajoutée avec succès")
       fetchBudgetData(budgetId)
       setDescription("")
@@ -104,7 +115,7 @@ const Page = ({ params }: PageProps) => {
     if (amountNumber === null || !budgetId) return
 
     try {
-      await addIncomeToBudget(budgetId, amountNumber, description)
+      await addIncomeToBudget(budgetId, amountNumber, description.trim())
       setNotification("Revenu ajouté avec succès")
       fetchBudgetData(budgetId)
       setDescription("")
@@ -120,30 +131,65 @@ const Page = ({ params }: PageProps) => {
     try {
       await deleteBudget(budgetId)
       closeModal("confirm_delete")
-      setToastVisible(true)
+      setNotification("Budget supprimé")
       setTimeout(() => {
         router.push("/budgets")
-      }, 1500)
+      }, 1200)
     } catch (error) {
       console.error("Erreur lors de la suppression du budget", error)
     }
   }
 
-  const handleDeleteTransaction = async (transactionId: string) => {
-    if (!budgetId) return
-
+  // Suppression réelle, envoyée au serveur une fois le délai d'annulation écoulé
+  const commitDelete = async (id: string) => {
     try {
-      await deleteTransaction(transactionId)
-      fetchBudgetData(budgetId)
-      setToastVisible(true)
-      setTimeout(() => {
-        setToastVisible(false)
-      }, 1500)
-      closeModal("confirm_delete_transaction")
+      await deleteTransaction(id)
     } catch (error) {
       console.error("Erreur lors de la suppression de la transaction ", error)
+      setNotification("Erreur lors de la suppression")
     }
+    if (budgetId) await fetchBudgetData(budgetId)
+    setHiddenIds((prev) => prev.filter((x) => x !== id))
   }
+
+  const scheduleDelete = (id: string) => {
+    // Valide tout de suite la suppression précédente encore en attente
+    if (pendingRef.current) {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      commitDelete(pendingRef.current)
+    }
+
+    pendingRef.current = id
+    setHiddenIds((prev) => [...prev, id])
+    setUndoVisible(true)
+
+    timerRef.current = setTimeout(() => {
+      pendingRef.current = null
+      setUndoVisible(false)
+      commitDelete(id)
+    }, UNDO_DELAY)
+  }
+
+  const undoDelete = () => {
+    const id = pendingRef.current
+    if (!id) return
+    if (timerRef.current) clearTimeout(timerRef.current)
+    pendingRef.current = null
+    setHiddenIds((prev) => prev.filter((x) => x !== id))
+    setUndoVisible(false)
+  }
+
+  // Transactions visibles (les suppressions en attente sont masquées), plus récentes d'abord
+  const visibleTransactions = [...(budget?.transactions ?? [])]
+    .filter((t) => !hiddenIds.includes(t.id))
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+
+  const visibleBudget: Budget | undefined = budget
+    ? { ...budget, transactions: visibleTransactions }
+    : undefined
 
   return (
     <Wrapper>
@@ -151,7 +197,9 @@ const Page = ({ params }: PageProps) => {
       <dialog id="confirm_delete" className="modal">
         <div className="modal-box">
           <h3 className="font-bold text-lg">Confirmer la suppression</h3>
-          <p className="py-4">Voulez-vous vraiment supprimer ce budget ?</p>
+          <p className="py-4">
+            Voulez-vous vraiment supprimer ce budget et toutes ses transactions ?
+          </p>
           <div className="modal-action">
             <form method="dialog">
               <button className="btn">Annuler</button>
@@ -166,50 +214,33 @@ const Page = ({ params }: PageProps) => {
         </form>
       </dialog>
 
-      {/* Modale suppression transaction */}
-      <dialog id="confirm_delete_transaction" className="modal">
-        <div className="modal-box">
-          <h3 className="font-bold text-lg">Confirmer la suppression</h3>
-          <p className="py-4">Voulez-vous vraiment supprimer cette transaction ?</p>
-          <div className="modal-action">
-            <form method="dialog">
-              <button className="btn">Annuler</button>
-            </form>
-            <button
-              className="btn btn-error text-white"
-              onClick={() => handleDeleteTransaction(selectedTransactionId)}
-            >
-              Supprimer
+      {/* Message d'annulation */}
+      {undoVisible && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-50 w-[calc(100%-2rem)] max-w-sm">
+          <div className="alert shadow-lg flex justify-between">
+            <span>Transaction supprimée</span>
+            <button className="btn btn-sm btn-ghost text-accent" onClick={undoDelete}>
+              Annuler
             </button>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>fermer</button>
-        </form>
-      </dialog>
-
-      {toastVisible && (
-        <div className="toast toast-top toast-end z-50">
-          <div className="alert alert-info">
-            <span>Opération effectuée avec succès.</span>
           </div>
         </div>
       )}
 
       {notification && (
-        <Notification message={notification} onclose={closeNotification} />
+        <Notification message={notification} onclose={() => setNotification("")} />
       )}
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Colonne de gauche */}
         <div className="md:w-1/3 flex flex-col gap-4">
-          {budget && <BudgetItem budget={budget} enableHover={0} />}
+          {visibleBudget && <BudgetItem budget={visibleBudget} enableHover={0} />}
 
           {/* Carte du formulaire */}
           <div className="rounded-2xl border border-base-300 bg-base-100 p-4 flex flex-col gap-3">
             <h2 className="font-semibold">Nouvelle opération</h2>
 
             <input
+              ref={descriptionRef}
               type="text"
               value={description}
               placeholder="Description"
@@ -217,13 +248,7 @@ const Page = ({ params }: PageProps) => {
               className="input input-bordered w-full"
             />
 
-            <input
-              type="number"
-              value={amount}
-              placeholder="Montant (FCFA)"
-              onChange={(e) => setAmount(e.target.value)}
-              className="input input-bordered w-full"
-            />
+            <AmountInput value={amount} onChange={setAmount} />
 
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -252,7 +277,7 @@ const Page = ({ params }: PageProps) => {
 
         {/* Colonne de droite */}
         <div className="md:w-2/3">
-          {budget?.transactions && budget.transactions.length > 0 ? (
+          {visibleTransactions.length > 0 ? (
             <div className="overflow-x-auto rounded-2xl border border-base-300 bg-base-100">
               <table className="table">
                 <thead>
@@ -265,7 +290,7 @@ const Page = ({ params }: PageProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {budget.transactions.map((transaction) => {
+                  {visibleTransactions.map((transaction) => {
                     const isIncome = transaction.type === "INCOME"
                     const date = new Date(transaction.createdAt)
 
@@ -309,10 +334,7 @@ const Page = ({ params }: PageProps) => {
                         <td className="text-right">
                           <button
                             className="btn btn-sm btn-ghost text-error"
-                            onClick={() => {
-                              setSelectedTransactionId(transaction.id)
-                              openModal("confirm_delete_transaction")
-                            }}
+                            onClick={() => scheduleDelete(transaction.id)}
                             aria-label="Supprimer la transaction"
                           >
                             <Trash className="w-4 h-4" />
@@ -325,9 +347,15 @@ const Page = ({ params }: PageProps) => {
               </table>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-base-300 p-10 flex flex-col items-center justify-center text-gray-400">
-              <Send strokeWidth={1.5} className="w-8 h-8 text-accent mb-2" />
+            <div className="rounded-2xl border border-dashed border-base-300 p-10 flex flex-col items-center justify-center gap-3 text-center text-gray-400">
+              <Send strokeWidth={1.5} className="w-8 h-8 text-accent" />
               <span>Aucune transaction pour le moment</span>
+              <button
+                className="btn btn-sm btn-accent"
+                onClick={() => descriptionRef.current?.focus()}
+              >
+                Ajouter une opération
+              </button>
             </div>
           )}
         </div>

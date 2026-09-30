@@ -1,11 +1,13 @@
 "use client"
 import { Transaction } from '@/type'
 import { useUser } from '@clerk/nextjs'
+import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
 import { addIncome, getTransactionByEmailAndPeriod } from '../actions'
 import Wrapper from '../components/Wrapper'
 import TransactionItems from '../components/TransactionItems'
 import Notification from '../components/Notification'
+import AmountInput from '../components/AmountInput'
 
 const Page = () => {
   const { user } = useUser()
@@ -33,7 +35,14 @@ const Page = () => {
 
   useEffect(() => {
     fetchTransactions(period)
-  }, [email])
+  }, [email, period])
+
+  // Rafraîchissement après un ajout rapide
+  useEffect(() => {
+    const handler = () => fetchTransactions(period)
+    window.addEventListener("etrack:refresh", handler)
+    return () => window.removeEventListener("etrack:refresh", handler)
+  }, [email, period])
 
   const openModal = () => {
     const modal = document.getElementById("add_income_modal") as HTMLDialogElement
@@ -50,7 +59,7 @@ const Page = () => {
 
     const amountNumber = Number(amount)
 
-    if (!description || !amount) {
+    if (!description.trim() || !amount) {
       setNotification("Veuillez remplir tous les champs")
       return
     }
@@ -61,7 +70,7 @@ const Page = () => {
     }
 
     try {
-      await addIncome(email, amountNumber, description)
+      await addIncome(email, amountNumber, description.trim())
       setNotification("Revenu ajouté avec succès")
       setDescription("")
       setAmount("")
@@ -78,12 +87,12 @@ const Page = () => {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const totalExpense = transactions
-    .filter((t) => t.type === "EXPENSE")
+    .filter((t) => t.type !== "INCOME")
     .reduce((sum, t) => sum + t.amount, 0)
 
   const balance = totalIncome - totalExpense
 
-  const format = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const format = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')
 
   return (
     <Wrapper>
@@ -102,13 +111,7 @@ const Page = () => {
               onChange={(e) => setDescription(e.target.value)}
               className="input input-bordered w-full"
             />
-            <input
-              type="number"
-              value={amount}
-              placeholder="Montant"
-              onChange={(e) => setAmount(e.target.value)}
-              className="input input-bordered w-full"
-            />
+            <AmountInput value={amount} onChange={setAmount} />
           </div>
           <div className="modal-action">
             <button className="btn" onClick={closeModal}>
@@ -119,16 +122,16 @@ const Page = () => {
             </button>
           </div>
         </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>fermer</button>
+        </form>
       </dialog>
 
       <div className='flex flex-col md:flex-row justify-center items-center gap-3 mb-6'>
         <select
           className='select select-bordered select-sm md:select-md bg-base-100 border-orange-400'
           value={period}
-          onChange={(e) => {
-            setPeriod(e.target.value)
-            fetchTransactions(e.target.value)
-          }}
+          onChange={(e) => setPeriod(e.target.value)}
         >
           <option value="last7">Derniers 7 jours</option>
           <option value="last30">Derniers 30 jours</option>
@@ -144,15 +147,15 @@ const Page = () => {
       <div className='grid grid-cols-1 md:grid-cols-3 gap-3 mb-6'>
         <div className='bg-base-200/35 rounded-xl p-4 text-center'>
           <div className='text-xs text-gray-500'>Revenus</div>
-          <div className='text-lg font-bold text-success'>+ {format(totalIncome)} FCFA</div>
+          <div className='text-lg font-bold text-success whitespace-nowrap'>+ {format(totalIncome)} FCFA</div>
         </div>
         <div className='bg-base-200/35 rounded-xl p-4 text-center'>
           <div className='text-xs text-gray-500'>Dépenses</div>
-          <div className='text-lg font-bold text-error'>- {format(totalExpense)} FCFA</div>
+          <div className='text-lg font-bold text-error whitespace-nowrap'>- {format(totalExpense)} FCFA</div>
         </div>
         <div className='bg-base-200/35 rounded-xl p-4 text-center'>
           <div className='text-xs text-gray-500'>Solde</div>
-          <div className={`text-lg font-bold ${balance >= 0 ? 'text-success' : 'text-error'}`}>
+          <div className={`text-lg font-bold whitespace-nowrap ${balance >= 0 ? 'text-success' : 'text-error'}`}>
             {balance >= 0 ? '' : '- '}{format(Math.abs(balance))} FCFA
           </div>
         </div>
@@ -164,10 +167,18 @@ const Page = () => {
             <span className='loading loading-spinner loading-md'></span>
           </div>
         ) : transactions.length === 0 ? (
-          <div className='flex justify-center items-center h-full'>
+          <div className='flex flex-col items-center gap-3 py-8 text-center'>
             <span className='text-gray-500 text-sm'>
-              Aucune transaction à afficher.
+              Aucune transaction sur cette période.
             </span>
+            <div className='flex flex-wrap justify-center gap-2'>
+              <button className='btn btn-sm btn-accent' onClick={openModal}>
+                Ajouter un revenu
+              </button>
+              <Link href="/budgets" className='btn btn-sm btn-outline'>
+                Voir mes budgets
+              </Link>
+            </div>
           </div>
         ) : (
           <ul className='divide-y divide-base-300'>
