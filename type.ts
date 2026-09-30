@@ -4,7 +4,7 @@ export interface Transaction {
   description: string
   emoji: string | null
   createdAt: Date
-  type: "EXPENSE" | "INCOME"
+  type?: "EXPENSE" | "INCOME"
   budgetId?: string | null
   budgetName?: string | null
   budgetEmoji?: string | null
