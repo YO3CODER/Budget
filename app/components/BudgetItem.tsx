@@ -38,9 +38,10 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
         ? Math.min((totalExpenses / availableAmount) * 100, 100)
         : 0
 
+    // Espace insécable pour éviter tout retour à la ligne dans un montant
     const formatAmount = (amount: number): string => {
         if (amount === 0) return '0'
-        return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+        return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0')
     }
 
     const getProgressColor = (): string => {
@@ -52,7 +53,7 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
     const getRemainingColor = (): string => {
         if (remainingAmount < 0) return 'text-error'
         if (remainingAmount < availableAmount * 0.2) return 'text-warning'
-        return 'text-green-400'
+        return 'text-success'
     }
 
     const hoverClass = enableHover === 1
@@ -63,49 +64,60 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
     const remainingColor = getRemainingColor()
 
     return (
-        <li className={`p-4 rounded-2xl border-2 border-amber-400 base-300 
+        <li className={`p-4 sm:p-5 rounded-2xl border-2 border-amber-400 bg-base-100
             list-none mt-4 ${hoverClass}`}>
 
-            {/* En-tête avec emoji et nom */}
-            <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                    <div className='bg-accent/20 text-xl h-10 w-10 rounded-full flex justify-center items-center'>
+            {/* En-tête : emoji, nom, montant total */}
+            <div className='flex items-start justify-between gap-3'>
+                <div className='flex items-center gap-3 min-w-0'>
+                    <div className='bg-accent/20 text-xl h-10 w-10 shrink-0 rounded-full flex justify-center items-center'>
                         {budget.emoji || '💰'}
                     </div>
-                    <div className='flex flex-col ml-3'>
-                        <span className='font-bold text-xl'>{budget.name}</span>
-                        <span className='text-gray-400 text-sm'>
+                    <div className='flex flex-col min-w-0'>
+                        <span className='font-bold text-lg leading-tight truncate'>
+                            {budget.name}
+                        </span>
+                        <span className='text-gray-400 text-xs whitespace-nowrap'>
                             {transactionCount} transaction{transactionCount > 1 ? 's' : ''}
                         </span>
                     </div>
                 </div>
-                <div className="flex flex-col items-end">
-                    <div className="text-xl font-bold text-accent">
+
+                <div className="flex flex-col items-end shrink-0 text-right">
+                    <span className="text-lg font-bold text-accent whitespace-nowrap">
                         {formatAmount(availableAmount)} FCFA
-                    </div>
+                    </span>
                     {totalIncome > 0 && (
-                        <span className="text-xs text-success">
+                        <span className="text-xs text-success whitespace-nowrap">
                             dont +{formatAmount(totalIncome)} FCFA de revenus
                         </span>
                     )}
                 </div>
             </div>
 
-            {/* Montants dépensés et restants */}
-            <div className="flex justify-between items-center mt-4 text-gray-500">
-                <span className="text-red-400">
-                    {formatAmount(totalExpenses)} FCFA dépensés
-                </span>
-                <span className={remainingColor}>
-                    {formatAmount(Math.abs(remainingAmount))} FCFA {remainingAmount < 0 ? 'en excès' : 'restants'}
-                </span>
+            {/* Dépensés et restants */}
+            <div className="grid grid-cols-2 gap-3 mt-5">
+                <div className="flex flex-col">
+                    <span className="text-xs text-gray-400">Dépensés</span>
+                    <span className="font-semibold text-error whitespace-nowrap">
+                        {formatAmount(totalExpenses)} FCFA
+                    </span>
+                </div>
+                <div className="flex flex-col items-end text-right">
+                    <span className="text-xs text-gray-400">
+                        {remainingAmount < 0 ? 'En excès' : 'Restants'}
+                    </span>
+                    <span className={`font-semibold whitespace-nowrap ${remainingColor}`}>
+                        {formatAmount(Math.abs(remainingAmount))} FCFA
+                    </span>
+                </div>
             </div>
 
             {/* Barre de progression */}
-            <div className="w-full mt-4">
-                <div className="flex justify-between items-center text-xs mb-1">
+            <div className="w-full mt-5">
+                <div className="flex justify-between items-center text-xs mb-1 text-gray-500">
                     <span>Progression</span>
-                    <span className="font-medium bg-accent text-white rounded-lg ">{Math.round(progressValue)}%</span>
+                    <span className="font-semibold">{Math.round(progressValue)}%</span>
                 </div>
                 <progress
                     className={`progress ${progressColor} w-full`}
@@ -114,10 +126,10 @@ const BudgetItem: React.FC<BudgetItemProps> = ({ budget, enableHover }) => {
                 />
             </div>
 
-            {/* Message d'alerte si dépassement */}
+            {/* Alerte si dépassement */}
             {remainingAmount < 0 && (
-                <div className="mt-2 text-xs text-error bg-error/10 p-2 rounded-lg">
-                    ⚠️ Attention : Vous avez dépassé votre budget de {formatAmount(Math.abs(remainingAmount))} FCFA
+                <div className="mt-3 text-xs text-error bg-error/10 p-2 rounded-lg">
+                    Attention : vous avez dépassé votre budget de {formatAmount(Math.abs(remainingAmount))} FCFA
                 </div>
             )}
         </li>
