@@ -44,10 +44,10 @@ export default function Home() {
 
               <SignedIn>
                 <Link
-                  href="/dashboard"
+                  href="/budgets"
                   className="btn btn-sm md:btn-md btn-accent"
                 >
-                  Accéder au dashboard
+                  Accéder à mes budgets
                 </Link>
               </SignedIn>
             </div>
