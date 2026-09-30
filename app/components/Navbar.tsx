@@ -10,9 +10,9 @@ const Logo = () => (
   <Image
     src="/logo.svg"
     alt="Logo"
-    width={160}
-    height={40}
-    className="h-8 w-auto sm:h-10"
+    width={240}
+    height={64}
+    className="h-12 w-auto sm:h-16"
     priority
   />
 )
