@@ -1,8 +1,7 @@
 "use server";
 
 import { query } from "@/lib/db";
-import { Budget} from "@/type";
-
+import { Budget } from "@/type";
 
 export async function checkAndAddUser(email: string) {
   if (!email) return;
@@ -56,11 +55,11 @@ export async function getBudgetByUser(email: string): Promise<Budget[]> {
     const userResult = await query("SELECT id FROM users WHERE email = $1", [
       email,
     ]);
-    
+
     if (userResult.rows.length === 0) {
       throw new Error("Utilisateur non trouvé");
     }
-    
+
     const userId = userResult.rows[0].id;
 
     const rows = await query(
@@ -75,7 +74,8 @@ export async function getBudgetByUser(email: string): Promise<Budget[]> {
         t.description as transaction_description,
         t.amount as transaction_amount,
         t.emoji as transaction_emoji,
-        t.created_at as transaction_created
+        t.created_at as transaction_created,
+        t.type as transaction_type
       FROM budgets b
       LEFT JOIN transactions t 
       ON b.id = t.budget_id
@@ -94,25 +94,22 @@ export async function getBudgetByUser(email: string): Promise<Budget[]> {
           amount: Number(row.budget_amount),
           emoji: row.budget_emoji,
           createdAt: row.budget_created,
-          transactions: [], // ✅ Initialisé comme tableau vide
+          transactions: [],
         };
       }
 
-      // ✅ Récupération du budget avec une vérification de type
       const currentBudget = budgetsMap[row.budget_id];
-      
-      if (row.transaction_id && currentBudget) {
-        // ✅ Vérification supplémentaire que transactions existe
-        if (currentBudget.transactions) {
-          currentBudget.transactions.push({
-            id: row.transaction_id,
-            amount: Number(row.transaction_amount),
-            description: row.transaction_description,
-            emoji: row.transaction_emoji,
-            createdAt: row.transaction_created,
-            budgetId: row.budget_id,
-          });
-        }
+
+      if (row.transaction_id && currentBudget?.transactions) {
+        currentBudget.transactions.push({
+          id: row.transaction_id,
+          amount: Number(row.transaction_amount),
+          description: row.transaction_description,
+          emoji: row.transaction_emoji,
+          createdAt: row.transaction_created,
+          budgetId: row.budget_id,
+          type: row.transaction_type,
+        });
       }
     });
 
@@ -138,7 +135,8 @@ export async function getTransactionsByBudgetId(
       t.description as transaction_description,
       t.amount as transaction_amount,
       t.emoji as transaction_emoji,
-      t.created_at as transaction_created
+      t.created_at as transaction_created,
+      t.type as transaction_type
     FROM budgets b
     LEFT JOIN transactions t
     ON b.id = t.budget_id
@@ -168,6 +166,7 @@ export async function getTransactionsByBudgetId(
         emoji: row.transaction_emoji,
         createdAt: row.transaction_created,
         budgetId: budget_id,
+        type: row.transaction_type,
       })),
   };
 
@@ -192,7 +191,9 @@ export async function addTransactionToBudget(
     const budgetAmount = Number(budget.amount);
 
     const transactionResult = await query(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE budget_id = $1",
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM transactions
+       WHERE budget_id = $1 AND type = 'EXPENSE'`,
       [budgetId],
     );
 
@@ -206,15 +207,50 @@ export async function addTransactionToBudget(
     }
 
     const newTransaction = await query(
-      `INSERT INTO transactions (amount, description, emoji, budget_id)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
+       VALUES ($1, $2, $3, $4, $5, 'EXPENSE')
        RETURNING *`,
-      [amount, description, budget.emoji, budgetId],
+      [amount, description, budget.emoji, budgetId, budget.user_id],
     );
 
     return newTransaction.rows[0];
   } catch (error) {
     console.error("Erreur lors de l'ajout de la transaction :", error);
+    throw error;
+  }
+}
+
+export async function addIncome(
+  email: string,
+  amount: number,
+  description: string,
+) {
+  try {
+    if (!email) throw new Error("Email manquant");
+    if (!amount || amount <= 0) {
+      throw new Error("Le montant doit être un nombre positif");
+    }
+
+    const userResult = await query("SELECT id FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (userResult.rows.length === 0) {
+      throw new Error("Utilisateur non trouvé");
+    }
+
+    const userId = userResult.rows[0].id;
+
+    const newIncome = await query(
+      `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
+       VALUES ($1, $2, '', NULL, $3, 'INCOME')
+       RETURNING *`,
+      [amount, description, userId],
+    );
+
+    return newIncome.rows[0];
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du revenu :", error);
     throw error;
   }
 }
@@ -226,14 +262,11 @@ export const deleteBudget = async (budgetId: string) => {
   } catch (error) {
     console.error(
       "Erreur lors de la suppression du budget et des transactions",
-      error
+      error,
     );
     throw error;
   }
 };
-
-
-
 
 export async function deleteTransaction(transactionId: string) {
   try {
@@ -244,10 +277,10 @@ export async function deleteTransaction(transactionId: string) {
   }
 }
 
-
-
-
-export async function getTransactionByEmailAndPeriod(email: string, period: string) {
+export async function getTransactionByEmailAndPeriod(
+  email: string,
+  period: string,
+) {
   try {
     const now = new Date();
     let dateLimit;
@@ -267,13 +300,12 @@ export async function getTransactionByEmailAndPeriod(email: string, period: stri
         break;
       case "last365":
         dateLimit = new Date(now);
-        dateLimit.setFullYear(now.getFullYear() - 1); // ✅ Correction ici
+        dateLimit.setFullYear(now.getFullYear() - 1);
         break;
       default:
         throw new Error("Période invalide");
     }
 
-    // ✅ Requête SQL avec JOIN
     const result = await query(
       `
       SELECT 
@@ -281,50 +313,89 @@ export async function getTransactionByEmailAndPeriod(email: string, period: stri
         t.amount,
         t.description,
         t.emoji,
+        t.type,
         t.created_at as "createdAt",
         t.budget_id as "budgetId",
         b.name as "budgetName",
         b.emoji as "budgetEmoji"
       FROM transactions t
-      INNER JOIN budgets b ON t.budget_id = b.id
-      INNER JOIN users u ON b.user_id = u.id
+      INNER JOIN users u ON t.user_id = u.id
+      LEFT JOIN budgets b ON t.budget_id = b.id
       WHERE u.email = $1
       AND t.created_at >= $2
       ORDER BY t.created_at DESC
       `,
-      [email, dateLimit]
+      [email, dateLimit],
     );
 
-    return result.rows;
-
+    return result.rows.map((row: any) => ({
+      ...row,
+      amount: Number(row.amount),
+    }));
   } catch (error) {
     console.error("Erreur lors de la récupération des transactions :", error);
     throw error;
   }
 }
 
-
-
-
-
+// Total des dépenses uniquement
 export async function getTotalTransactionAmount(email: string) {
   try {
     const result = await query(
       `
       SELECT COALESCE(SUM(t.amount), 0) as total
       FROM transactions t
-      INNER JOIN budgets b ON t.budget_id = b.id
-      INNER JOIN users u ON b.user_id = u.id
-      WHERE u.email = $1
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE u.email = $1 AND t.type = 'EXPENSE'
       `,
-      [email]
+      [email],
     );
 
-    const totalAmount = Number(result.rows[0].total);
-    return totalAmount;
-
+    return Number(result.rows[0].total);
   } catch (error) {
     console.log("Erreur lors du calcul du montant total", error);
+    throw error;
+  }
+}
+
+// Total des revenus
+export async function getTotalIncomeAmount(email: string) {
+  try {
+    const result = await query(
+      `
+      SELECT COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE u.email = $1 AND t.type = 'INCOME'
+      `,
+      [email],
+    );
+
+    return Number(result.rows[0].total);
+  } catch (error) {
+    console.error("Erreur lors du calcul des revenus", error);
+    throw error;
+  }
+}
+
+// Solde global : revenus moins dépenses
+export async function getBalance(email: string) {
+  try {
+    const result = await query(
+      `
+      SELECT COALESCE(SUM(
+        CASE WHEN t.type = 'INCOME' THEN t.amount ELSE -t.amount END
+      ), 0) as balance
+      FROM transactions t
+      INNER JOIN users u ON t.user_id = u.id
+      WHERE u.email = $1
+      `,
+      [email],
+    );
+
+    return Number(result.rows[0].balance);
+  } catch (error) {
+    console.error("Erreur lors du calcul du solde", error);
     throw error;
   }
 }
@@ -335,21 +406,18 @@ export async function getTotalTransactionCount(email: string) {
       `
       SELECT COUNT(t.id) as count
       FROM transactions t
-      INNER JOIN budgets b ON t.budget_id = b.id
-      INNER JOIN users u ON b.user_id = u.id
+      INNER JOIN users u ON t.user_id = u.id
       WHERE u.email = $1
       `,
-      [email]
+      [email],
     );
 
     return Number(result.rows[0].count);
-
   } catch (error) {
     console.error("Erreur lors du comptage des transactions", error);
     throw error;
   }
 }
-
 
 export async function getReachedBudgets(email: string) {
   try {
@@ -362,7 +430,8 @@ export async function getReachedBudgets(email: string) {
           b.amount as budget_amount,
           COALESCE(SUM(t.amount), 0) as total_spent
         FROM budgets b
-        LEFT JOIN transactions t ON b.id = t.budget_id
+        LEFT JOIN transactions t 
+          ON b.id = t.budget_id AND t.type = 'EXPENSE'
         INNER JOIN users u ON b.user_id = u.id
         WHERE u.email = $1
         GROUP BY b.id, b.name, b.amount
@@ -372,20 +441,18 @@ export async function getReachedBudgets(email: string) {
         COUNT(CASE WHEN total_spent >= budget_amount THEN 1 END) as reached_budgets
       FROM budget_stats
       `,
-      [email]
+      [email],
     );
 
     const totalBudgets = Number(result.rows[0].total_budgets);
     const reachedBudgets = Number(result.rows[0].reached_budgets);
 
-    return `${reachedBudgets}/${totalBudgets}🔥`; // Budget Atteind / Nombre de budget
-
+    return `${reachedBudgets}/${totalBudgets}🔥`;
   } catch (error) {
     console.error("Erreur lors du calcul des budgets atteints", error);
     throw error;
   }
 }
-
 
 export async function getUserBudgetData(email: string) {
   try {
@@ -397,16 +464,16 @@ export async function getUserBudgetData(email: string) {
         b.amount as "totalBudgetAmount",
         COALESCE(SUM(t.amount), 0) as "totalTransactionAmount"
       FROM budgets b
-      LEFT JOIN transactions t ON b.id = t.budget_id
+      LEFT JOIN transactions t 
+        ON b.id = t.budget_id AND t.type = 'EXPENSE'
       INNER JOIN users u ON b.user_id = u.id
       WHERE u.email = $1
       GROUP BY b.id, b.name, b.amount
       `,
-      [email]
+      [email],
     );
 
     return result.rows;
-
   } catch (error) {
     console.error("Erreur lors de la récupération des données", error);
     throw error;

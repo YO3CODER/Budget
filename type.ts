@@ -1,12 +1,13 @@
-// types.ts
 export interface Transaction {
   id: string
   amount: number
   description: string
   emoji: string | null
   createdAt: Date
-  budgetId?: string
-  budgetName?:string
+  type: "EXPENSE" | "INCOME"
+  budgetId?: string | null
+  budgetName?: string | null
+  budgetEmoji?: string | null
 }
 
 export interface Budget {
