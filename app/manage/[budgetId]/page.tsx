@@ -154,15 +154,16 @@ const Page = ({ params }: PageProps) => {
           <p className="py-4">Voulez-vous vraiment supprimer ce budget ?</p>
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn" onClick={() => closeModal("confirm_delete")}>
-                Annuler
-              </button>
+              <button className="btn">Annuler</button>
             </form>
-            <button className="btn btn-error" onClick={handleDeleteBudget}>
+            <button className="btn btn-error text-white" onClick={handleDeleteBudget}>
               Supprimer
             </button>
           </div>
         </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>fermer</button>
+        </form>
       </dialog>
 
       {/* Modale suppression transaction */}
@@ -172,25 +173,23 @@ const Page = ({ params }: PageProps) => {
           <p className="py-4">Voulez-vous vraiment supprimer cette transaction ?</p>
           <div className="modal-action">
             <form method="dialog">
-              <button
-                className="btn"
-                onClick={() => closeModal("confirm_delete_transaction")}
-              >
-                Annuler
-              </button>
+              <button className="btn">Annuler</button>
             </form>
             <button
-              className="btn btn-error"
+              className="btn btn-error text-white"
               onClick={() => handleDeleteTransaction(selectedTransactionId)}
             >
               Supprimer
             </button>
           </div>
         </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>fermer</button>
+        </form>
       </dialog>
 
       {toastVisible && (
-        <div className="toast toast-top toast-end">
+        <div className="toast toast-top toast-end z-50">
           <div className="alert alert-info">
             <span>Opération effectuée avec succès.</span>
           </div>
@@ -201,107 +200,137 @@ const Page = ({ params }: PageProps) => {
         <Notification message={notification} onclose={closeNotification} />
       )}
 
-      <div className="flex md:flex-row flex-col">
+      <div className="flex flex-col md:flex-row gap-6">
         {/* Colonne de gauche */}
-        <div className="md:w-1/3">
-          {budget && <BudgetItem budget={budget} enableHover={1} />}
+        <div className="md:w-1/3 flex flex-col gap-4">
+          {budget && <BudgetItem budget={budget} enableHover={0} />}
 
-          <button
-            className="btn btn-error mt-4 text-white"
-            onClick={() => openModal("confirm_delete")}
-          >
-            Supprimer le budget
-          </button>
+          {/* Carte du formulaire */}
+          <div className="rounded-2xl border border-base-300 bg-base-100 p-4 flex flex-col gap-3">
+            <h2 className="font-semibold">Nouvelle opération</h2>
 
-          <div className="space-y-4 flex flex-col mt-4">
             <input
               type="text"
               value={description}
               placeholder="Description"
               onChange={(e) => setDescription(e.target.value)}
-              className="input input-bordered mb-3 w-full"
+              className="input input-bordered w-full"
             />
 
             <input
               type="number"
               value={amount}
-              placeholder="Montant"
+              placeholder="Montant (FCFA)"
               onChange={(e) => setAmount(e.target.value)}
-              className="input input-bordered mb-3 w-full"
+              className="input input-bordered w-full"
             />
 
-            <button onClick={handleAddTransaction} className="btn text-red-400">
-              Ajouter votre dépense
-            </button>
-
-            <button onClick={handleAddIncome} className="btn text-green-500">
-              Ajouter un revenu
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleAddTransaction}
+                className="btn btn-outline btn-error"
+              >
+                Dépense
+              </button>
+              <button
+                onClick={handleAddIncome}
+                className="btn btn-outline btn-success"
+              >
+                Revenu
+              </button>
+            </div>
           </div>
+
+          <button
+            className="btn btn-ghost text-error btn-sm self-start"
+            onClick={() => openModal("confirm_delete")}
+          >
+            <Trash className="w-4 h-4" />
+            Supprimer le budget
+          </button>
         </div>
 
         {/* Colonne de droite */}
-        {budget?.transactions && budget.transactions.length > 0 ? (
-          <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 md:mt-0 mt-4 md:w-2/3 ml-4">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Badge</th>
-                  <th>Montant</th>
-                  <th>Description</th>
-                  <th>Heure de création </th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {budget.transactions.map((transaction) => {
-                  const isIncome = transaction.type === "INCOME"
-                  return (
-                    <tr key={transaction.id}>
-                      <td className="text-shadow-base-300 md:text-3xl">
-                        {transaction.emoji}
-                      </td>
-                      <td>
-                        <div
-                          className={`badge badge-xs md:badge-sm ${
-                            isIncome ? "badge-success text-white" : "badge-accent"
-                          }`}
-                        >
-                          {isIncome ? "+" : "-"}
-                          {transaction.amount} FCFA
-                        </div>
-                      </td>
-                      <td className="text-blue-300">{transaction.description}</td>
-                      <td>
-                        {new Date(transaction.createdAt).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
-                      </td>
-                      <td className="text-red-400 underline decoration-dotted">
-                        <button
-                          className="btn btn-sm btn-error text-white"
-                          onClick={() => {
-                            setSelectedTransactionId(transaction.id)
-                            openModal("confirm_delete_transaction")
-                          }}
-                        >
-                          <Trash className="w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="md:w-2/3 mt-10 md:ml-4 flex items-center justify-center">
-            <Send strokeWidth={1.5} className="w-8 h-8 text-accent" />
-            <span className="text-red-400 ml-2">Aucune transaction</span>
-          </div>
-        )}
+        <div className="md:w-2/3">
+          {budget?.transactions && budget.transactions.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-base-300 bg-base-100">
+              <table className="table">
+                <thead>
+                  <tr className="text-xs uppercase text-gray-500">
+                    <th></th>
+                    <th className="whitespace-nowrap">Montant</th>
+                    <th>Description</th>
+                    <th className="whitespace-nowrap">Date</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {budget.transactions.map((transaction) => {
+                    const isIncome = transaction.type === "INCOME"
+                    const date = new Date(transaction.createdAt)
+
+                    return (
+                      <tr key={transaction.id} className="hover:bg-base-200/40">
+                        <td className="text-2xl">{transaction.emoji}</td>
+
+                        <td>
+                          <span
+                            className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-sm font-semibold ${
+                              isIncome
+                                ? "bg-success/15 text-success"
+                                : "bg-error/15 text-error"
+                            }`}
+                          >
+                            {isIncome ? "+" : "-"}{" "}
+                            {transaction.amount.toLocaleString("fr-FR")} FCFA
+                          </span>
+                        </td>
+
+                        <td className="font-medium min-w-[140px]">
+                          {transaction.description}
+                        </td>
+
+                        <td className="whitespace-nowrap text-sm text-gray-500">
+                          <div>
+                            {date.toLocaleDateString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <div className="text-xs">
+                            {date.toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        </td>
+
+                        <td className="text-right">
+                          <button
+                            className="btn btn-sm btn-ghost text-error"
+                            onClick={() => {
+                              setSelectedTransactionId(transaction.id)
+                              openModal("confirm_delete_transaction")
+                            }}
+                            aria-label="Supprimer la transaction"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-base-300 p-10 flex flex-col items-center justify-center text-gray-400">
+              <Send strokeWidth={1.5} className="w-8 h-8 text-accent mb-2" />
+              <span>Aucune transaction pour le moment</span>
+            </div>
+          )}
+        </div>
       </div>
     </Wrapper>
   )
