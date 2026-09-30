@@ -7,24 +7,14 @@ import { checkAndAddUser } from '../actions'
 import { Layers, Package, ChevronDown, LayoutGrid } from 'lucide-react'
 
 const Logo = () => (
-  <h1 className='flex text-2xl items-center font-bold'>
-    <Image
-      src="/logo.svg"
-      alt="Monity"
-      width={40}
-      height={40}
-      className="h-8 w-8 sm:h-10 sm:w-10"
-      priority
-    />
-    <span className="ml-2 text-xl sm:text-2xl italic">
-      <b className="text-violet-400">M</b>
-      <b className="text-yellow-400">o</b>
-      <b className="text-red-400">n</b>
-      <b className="text-green-400">i</b>
-      <b className="text-blue-400">t</b>
-      <b className="text-pink-400">y</b>
-    </span>
-  </h1>
+  <Image
+    src="/logo.svg"
+    alt="Logo"
+    width={160}
+    height={40}
+    className="h-8 w-auto sm:h-10"
+    priority
+  />
 )
 
 const Navbar = () => {
