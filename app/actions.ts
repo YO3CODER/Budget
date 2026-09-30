@@ -190,17 +190,19 @@ export async function addTransactionToBudget(
     const budget = budgetResult.rows[0];
     const budgetAmount = Number(budget.amount);
 
+    // Dépenses moins revenus rattachés à ce budget
     const transactionResult = await query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
+      `SELECT COALESCE(SUM(
+         CASE WHEN type = 'INCOME' THEN -amount ELSE amount END
+       ), 0) AS total
        FROM transactions
-       WHERE budget_id = $1 AND type = 'EXPENSE'`,
+       WHERE budget_id = $1`,
       [budgetId],
     );
 
-    const totalTransaction = Number(transactionResult.rows[0].total);
-    const totalWithNewTransaction = totalTransaction + amount;
+    const netSpent = Number(transactionResult.rows[0].total);
 
-    if (totalWithNewTransaction > budgetAmount) {
+    if (netSpent + amount > budgetAmount) {
       throw new Error(
         "Le montant de la transaction est supérieur au montant du budget",
       );
@@ -220,6 +222,39 @@ export async function addTransactionToBudget(
   }
 }
 
+export async function addIncomeToBudget(
+  budgetId: string,
+  amount: number,
+  description: string,
+) {
+  try {
+    if (!amount || amount <= 0) {
+      throw new Error("Le montant doit être un nombre positif");
+    }
+
+    const budgetResult = await query("SELECT * FROM budgets WHERE id = $1", [
+      budgetId,
+    ]);
+
+    if (budgetResult.rows.length === 0) {
+      throw new Error("Budget non trouvé");
+    }
+
+    const budget = budgetResult.rows[0];
+
+    const newIncome = await query(
+      `INSERT INTO transactions (amount, description, emoji, budget_id, user_id, type)
+       VALUES ($1, $2, $3, $4, $5, 'INCOME')
+       RETURNING *`,
+      [amount, description, budget.emoji, budgetId, budget.user_id],
+    );
+
+    return newIncome.rows[0];
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du revenu au budget :", error);
+    throw error;
+  }
+}
 export async function addIncome(
   email: string,
   amount: number,
